@@ -6,17 +6,13 @@ Or read it as a normal file, and handled the deliminations and error trapping.
 I could have built in reading from the web, or svn, I suppose.
 I've gone for a neat, if limited use, TStringList read from file.
 
-Each record could obviously, neatly, have been created as an Route object.
+V2:
+So for each route, an object is created that can be referenced later.
 The Companies themselves could have been created as Company objects.
-This would have then lead on to extending the structure, for stops, times, costs, drivers.
+The structure could be extended, for stops, times, costs, drivers.
+We could have added images to the tree.
 
-Each node in the treeview could then have had the object added to it.
-
-And in the final close, we would have free'ed the objects.
-
-But for the simple purposes of the treeView it was not absolutely necessary.
-Much as we could have added images to the tree.
-Or a ProgressBar, or an option to cancel mid process.
+Could have added a ProgressBar, or an option to cancel mid process.
 Or far more enhaned error handling / messaging.
 
 I may also have cheated, by holding the top three nodes as private variables,
@@ -26,14 +22,15 @@ And the ListBox was simply for debugging, easy to remove.
 Note, I have also not included any unit testing.
 
 Morris Evans
-26/08/22
+30/08/22
 }
 
 
 interface
 
 uses
-  Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, System.StrUtils,
+  Winapi.Windows, Winapi.Messages,
+  System.SysUtils, System.Variants, System.Classes, System.StrUtils, System.UITypes,
   Vcl.Graphics, Vcl.Controls, Vcl.Forms, Vcl.Dialogs, Vcl.ComCtrls, Vcl.StdCtrls, Vcl.Menus,
   Vcl.Buttons;
 
@@ -64,11 +61,12 @@ type
     procedure btnImportClick(Sender: TObject);
     procedure Exit1Click(Sender: TObject);
     procedure About1Click(Sender: TObject);
+    procedure TreeView1DblClick(Sender: TObject);
   private
     { Private declarations }
     WeekNode, SatNode, SunNode : TTreeNode;
     procedure AddTopNodes;
-    procedure AddToNode(iTop : integer; strCompany, strRoute : string);
+    procedure AddToNode(iTop : integer; strCompany, strRoute, strDays : string);
     function FindCompany(topNode : TTreeNode; strCompany : string) : TTreeNode;
     function NodePosition(aNode : TTreeNode) : integer;
   public
@@ -81,6 +79,8 @@ var
 implementation
 
 {$R *.dfm}
+
+uses Unit2;
 
 //Locate the import file:
 procedure TfrmImportFile.btnBrowseClick(Sender: TObject);
@@ -135,17 +135,17 @@ begin
 
         if (Pos('1',strDays.Substring(0,5)) > 0 ) then //Weekday
         begin
-            AddToNode(0, strCompany, strRoute);
+            AddToNode(0, strCompany, strRoute, strDays);
             ListBox1.AddItem('Weekday', nil);
         end;
         if (strDays.Substring(5,1) = '1') then
         begin
-            AddToNode(1, strCompany, strRoute);
+            AddToNode(1, strCompany, strRoute, strDays);
             ListBox1.AddItem('Sat', nil);
         end;
         if (strDays.Substring(6,1) = '1') then   // Sunday
         begin
-            AddToNode(2, strCompany, strRoute);
+            AddToNode(2, strCompany, strRoute, strDays);
             ListBox1.AddItem('Sun', nil);
         end;
       end;
@@ -165,9 +165,9 @@ begin
      ShowMessage('Created by Morris Evans.');
 end;
 
-procedure TfrmImportFile.AddToNode(iTop : integer; strCompany, strRoute : string);
+procedure TfrmImportFile.AddToNode(iTop : integer; strCompany, strRoute, strDays : string);
 var nodeTop, nodeCompany : TTreeNode;
-//  ThisRoute : TRoute;
+  ThisRoute: TRoute;
 begin
   case iTop of
    0 : nodeTop := WeekNode;
@@ -181,12 +181,15 @@ begin
   if nodeCompany = nil then
     nodeCompany := TreeView1.Items.AddChild(nodeTop, strCompany);
   //then add the route
-  TreeView1.Items.AddChild(nodeCompany, strRoute);
+//  TreeView1.Items.AddChild(nodeCompany, strRoute);
 
-  {
-  ThisRoute := new TRoute
-  TreeView1.Items.AddChildObject(nodeCompany, strRoute, route);
-  }
+  ThisRoute := TRoute.Create();
+  ThisRoute.RouteName := strRoute;
+  ThisRoute.OperatorName := strCompany;
+  ThisRoute.DaysOfWeek := strDays;
+
+  TreeView1.Items.AddChildObject(nodeCompany, strRoute, ThisRoute);
+
 end;
 
 //Locate existing company record for the day selection
@@ -227,6 +230,15 @@ begin
 end;
 
 
+procedure TfrmImportFile.TreeView1DblClick(Sender: TObject);
+var i : integer;
+begin
+    if assigned(TreeView1.Selected.Data) then
+      ShowMessage( 'Operator : ' + TRoute(TreeView1.Selected.Data).OperatorName  + #13#10 +
+                   'Route:' + TRoute(TreeView1.Selected.Data).RouteName + #13#10 +
+                   'Days :' + TRoute(TreeView1.Selected.Data).DaysOfWeek );
+end;
+
 procedure TfrmImportFile.Exit1Click(Sender: TObject);
 begin
     Close;
@@ -234,8 +246,12 @@ end;
 
 //Tidy up any objects created:
 procedure TfrmImportFile.FormClose(Sender: TObject; var Action: TCloseAction);
+var i : integer;
 begin
 //
+  for i := 0 to treeview1.Items.Count-1 do
+    if assigned(treeview1.Items[i].Data) then
+      FreeAndNil(treeview1.Items[i].Data);
 end;
 
 //Initialise

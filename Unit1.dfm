@@ -77,6 +77,7 @@ object frmImportFile: TfrmImportFile
     Align = alClient
     Indent = 19
     TabOrder = 2
+    OnDblClick = TreeView1DblClick
     ExplicitLeft = 32
     ExplicitTop = 161
     ExplicitWidth = 273
